@@ -1,0 +1,277 @@
+﻿@{
+    ViewBag.Title = "To Do List";
+}
+
+
+@section scripts { 
+    <style type="text/css">
+        table
+        {
+            border: 1px solid #000;
+            border-collapse: collapse;
+            color: #666666;
+            min-width: 200px;
+        }
+        
+        tr
+        {
+            border: 1px solid #000;
+            line-height: 25px;
+        }
+        
+        th
+        {
+            background-color: #B1C3CC;
+            color: #000;
+            font-size: 13px;
+            text-align: left;
+        }
+        
+        th, td
+        {
+            padding-left: 5px;
+        }
+
+        #status {
+            color: red;
+        }
+        
+    </style>
+
+    <script src="@Url.Content("~/Scripts/knockout-2.1.0.debug.js")" type="text/javascript"></script>
+    <script type="text/javascript">
+
+        function ViewModel() {
+
+            var self = this;
+
+            // A nested view model that represents a single to do .
+            function ToDoViewModel(todo) {
+                var self = this;
+
+                self.Id = todo.Id;
+                self.Title = todo.Title;
+                self.Description = todo.Description;
+                self.DueDate = todo.DueDate;
+            }
+
+            self.todos = ko.observableArray();   // Contains the list of todos
+            self.todo = ko.observable();
+
+            self.status = ko.observable();
+
+            // Get a list of all todos
+            self.getAll = function () {
+
+                self.todos.removeAll();
+                $.getJSON("/api/todos", function (todos) {
+                    $.each(todos, function (index, todo) {
+                        self.todos.push(new ToDoViewModel(todo));
+                    })
+                });
+            }
+
+            // Find a todo by todo ID
+            self.getById = function () {
+                self.status("");
+                var id = $('#todoId').val();
+
+                if (!id.length) {
+                    self.status("ID is required");
+                    return;
+                }
+                
+                // Send AJX request to get the todo by ID
+                $.getJSON(
+                    'api/todos/' + id,
+                    function (data) {
+                        self.todo(new ToDoViewModel(data));
+                    })
+                    // Handler for error response:
+                    .fail(
+                        function (xhr, textStatus, err) {
+                            self.todo(null);
+                            self.status(err);
+                        });
+            }
+
+            // Update todo details
+            self.update = function() {
+                self.status("");
+                var id = $('#todoId').val();
+
+                var todo = {
+                    Title: $('#title').val(),
+                    Description: $('#description').val(),
+                    DueDate: $('#duedate').val()
+                };
+
+                $.ajax({
+                    url: 'api/todos/' + id,
+                    cache: false,
+                    type: 'PUT',
+                    contentType: 'application/json; charset=utf-8',
+                    data: JSON.stringify(todo),
+                    success: self.getAll
+                })
+                .fail(
+                function (xhr, textStatus, err) {
+                    self.status(err);
+                });
+            }
+
+            self.create = function () {
+                self.status("");
+
+                var todo = {
+                    Title: $('#title2').val(),
+                    Description: $('#description2').val(),
+                    DueDate: $('#duedate2').val()
+                };
+
+                $.ajax({
+                    url: 'api/todos',
+                    cache: false,
+                    type: 'POST',
+                    contentType: 'application/json; charset=utf-8',
+                    data: JSON.stringify(todo),
+                    statusCode: {
+                        201 /*Created*/: function (data) {
+                            self.todos.push(data);
+                        }
+                    }
+                })
+                .fail(
+                function (xhr, textStatus, err) {
+                    self.status(err);
+                });
+
+            }
+
+            // Initialize the view-model
+            $.getJSON("/api/todos", function (todos) {
+                $.each(todos, function (index, todo) {
+                    self.todos.push(new ToDoViewModel(todo));
+                })
+            });
+
+        }
+
+        function clearStatus() {
+            $('#status').html('');
+        }
+
+        function add() {
+
+            clearStatus();
+
+            var todo = ko.toJS(viewModel);
+            var json = JSON.stringify(todo);
+
+            $.ajax({
+                url: API_URL,
+                cache: false,
+                type: 'POST',
+                contentType: 'application/json; charset=utf-8',
+                data: json,
+                statusCode: {
+                    201 /*Created*/: function (data) {
+                        self.todos.push(data);
+                    }
+                }
+            });
+        }
+
+        var viewModel = new ViewModel();
+        ko.applyBindings(viewModel);
+
+        // Initialize jQuery tab widget
+        $("#tabs").tabs();
+     
+    </script>
+} 
+
+
+<div id="body">
+    <section class="content-wrapper main-content">
+        <h3>ToDo List</h3>
+
+        <table id="todos">
+        <thead>
+            <tr><th>ID</th><th>Title</th><th>Description</th><th>DueDate</th></tr>
+        </thead>
+        <tbody data-bind="foreach: todos">
+            <tr>
+                <td data-bind="text: Id"></td>
+                <td data-bind="text: Title"></td>
+                <td data-bind="text: Description"></td>
+                <td data-bind="text: DueDate"></td>
+            </tr>
+        </tbody>
+        </table>
+
+    </section>
+    <section id="detail" class="content-wrapper">
+
+    <div id="tabs"> <!-- div for jQuery UI tabs -->
+	    <ul>
+		    <li><a href="#viewTab">View To Do List</a></li>
+		    <li><a href="#addNewTab">Add To Do Item</a></li>
+	    </ul>
+
+        <div id="viewTab">
+        <label for="todoId">ID</label>
+        <input type="text" title="ID" name='Id' id="todoId" size="5"/>
+        <input type="button" value="Get" data-bind="click: getById"/>
+
+        <div data-bind="if: todo()">
+            <div>
+            <label for="title">Title</label>
+            <input data-bind="value: todo().Title" type="text" title="Title" id="title" />
+            </div>
+
+            <div>
+            <label for="description">Description</label>
+            <input data-bind="value: todo().Description" type="text" title="Description" id="description" />
+            </div>
+
+            <div>
+            <label for="duedate">DueDate</label>
+            <input data-bind="value: todo().DueDate" type="text" title="DueDate" id="duedate" />
+            </div>
+
+            <div>
+            <input type="button" value="Update" data-bind="click: update" />
+            </div>
+        </div>
+        </div>
+
+        <div id="addNewTab">
+            <div>
+            <label for="title">Title</label>
+            <input type="text" title="Title" id="title2" />
+            </div>
+
+            <div>
+            <label for="description">Description</label>
+            <input type="text" title="Description" id="description2" />
+            </div>
+
+            <div>
+            <label for="duedate">DueDate</label>
+            <input type="text" title="DueDate" id="duedate2" />
+            </div>
+
+            <div>
+            <input type="button" value="Add New" data-bind="click: create"" />
+            </div>
+        </div>
+
+    </div>
+    <div>
+        <p id="status" data-bind="text: status" />
+    </div>
+
+    </section>
+</div>
+
